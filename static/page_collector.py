@@ -1,4 +1,4 @@
-from base.config import BaseScraperConfig
+from base.config import BaseScraperConfig, ProxyConfig
 import aiohttp
 import asyncio
 
@@ -8,7 +8,7 @@ from typing import Optional, Dict
 class PageCollectorConfig(BaseScraperConfig):
     def __init__(
             self,
-            proxy: Optional[Dict[str, str]] = None,
+            proxy: Optional[ProxyConfig] = None,
             user_agent: Optional[str] = None,
             headers: Optional[Dict[str, str]] = None,
             timeout: int = 3000
@@ -36,9 +36,9 @@ class PageCollector:
             merged_headers["User-Agent"] = self.config.user_agent
         if headers:
             merged_headers.update(headers)
-
+        default_proxy_url = self.config.proxy.to_url()
         # 优先使用传入的代理，否则用配置里的默认代理
-        proxy_url = proxy or (self.config.proxy if self.config.proxy else None)
+        proxy_url = proxy or (default_proxy_url if default_proxy_url else None)
 
         async with aiohttp.ClientSession(headers=merged_headers, timeout=timeout) as session:
             async with session.get(url, proxy=proxy_url) as response:
@@ -50,7 +50,7 @@ async def main():
     config = PageCollectorConfig(
         user_agent="MyCustomAgent/1.0",
         headers={"Authorization": "Bearer TOKEN"},
-        proxy={"server": "http://127.0.0.1:7890"},
+        proxy=ProxyConfig(server="http://127.0.0.1:7890"),
         timeout=5000
     )
     collector = PageCollector(config)

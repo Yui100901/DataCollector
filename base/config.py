@@ -19,6 +19,16 @@ class ProxyConfig:
         self.username = username
         self.password = password
 
+    def to_url(self) -> str:
+        """
+        转换为 aiohttp 等需要的完整代理 URL
+        有账号密码时拼接，没有时直接返回 server
+        """
+        if self.username and self.password:
+            # 在 server 中插入认证信息
+            return self.server.replace("://", f"://{self.username}:{self.password}@")
+        return self.server
+
     def to_dict(self) -> Dict[str, str]:
         """
         转换为 Playwright 需要的字典格式
