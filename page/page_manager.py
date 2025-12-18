@@ -7,7 +7,9 @@ from playwright.async_api import async_playwright, Browser, BrowserContext
 import logging
 
 from .browser_types import BrowserType
+from .config import BaseScraperConfig
 from .page_operator import PageOperator
+
 
 
 class AsyncPageManager:
@@ -22,6 +24,7 @@ class AsyncPageManager:
             viewport: Optional[Dict[str, int]] = None,
             user_agent: Optional[str] = None,
             proxy: Optional[Dict[str, str]] = None,
+            default_headers: Optional[Dict[str, str]] = None,
             logger_name: Optional[str] = None
     ):
         self.headless = headless
@@ -31,6 +34,7 @@ class AsyncPageManager:
         self.viewport = viewport or {"width": 1280, "height": 720}
         self.user_agent = user_agent
         self.proxy = proxy
+        self.default_headers = default_headers or {}
 
         self.logger = logging.getLogger(logger_name or __name__)
 
@@ -71,36 +75,26 @@ class AsyncPageManager:
             viewport: Optional[Dict[str, int]] = None,
             user_agent: Optional[str] = None,
             locale: Optional[str] = None,
-            timezone_id: Optional[str] = None
+            timezone_id: Optional[str] = None,
+            proxy: Optional[Dict[str, str]] = None,
+            extra_http_headers: Optional[Dict[str, str]] = None
     ) -> BrowserContext:
-        """创建新的浏览器上下文"""
-        if not self.browser:
-            raise RuntimeError("浏览器未启动,请先调用 start()")
-
-        if name in self.contexts:
-            self.logger.warning(f"上下文 {name} 已存在，返回现有上下文")
-            return self.contexts[name]
-
         context_options = {
             "viewport": viewport or self.viewport,
+            "user_agent": user_agent or self.user_agent,
+            "extra_http_headers": extra_http_headers or self.default_headers,
         }
-
-        if user_agent or self.user_agent:
-            context_options["user_agent"] = user_agent or self.user_agent
         if locale:
             context_options["locale"] = locale
         if timezone_id:
             context_options["timezone_id"] = timezone_id
-        if self.proxy:
-            context_options["proxy"] = self.proxy
+        if proxy or self.proxy:   # 优先使用传入的代理，否则用默认代理
+            context_options["proxy"] = proxy or self.proxy
 
-        self.logger.info(f"创建上下文: {name}")
         context = await self.browser.new_context(**context_options)
         context.set_default_timeout(self.timeout)
-
         self.contexts[name] = context
         self.pages[name] = {}
-        self.logger.info(f"上下文创建成功: {name}")
         return context
 
     async def new_page(
