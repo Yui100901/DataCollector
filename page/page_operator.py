@@ -201,11 +201,14 @@ class PageOperatorChain:
 
     def batch_press(
             self,
-            presses: List[Dict[str, str]]
+            presses: Union[Dict[str, str], List[Dict[str, str]]],
     ) -> "PageOperatorChain":
         """
         presses: [{"selector": "#input1", "key": "Enter"}, {"selector": "#input2", "key": "Tab"}]
         """
+        if isinstance(presses, dict):
+            presses = [{"selector": k, "key": v} for k, v in presses.items()]
+
         for item in presses:
             selector, key = item["selector"], item["key"]
             self._tasks.append(lambda s=selector, k=key: self.page.press(s, k))
