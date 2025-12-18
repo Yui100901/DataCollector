@@ -1,4 +1,6 @@
 from typing import Optional, Dict
+from urllib.parse import urlparse, urlunparse,quote
+
 
 class ProxyConfig:
     """
@@ -11,9 +13,12 @@ class ProxyConfig:
             server: str,
             username: Optional[str] = None,
             password: Optional[str] = None
-    ):
+    ) -> None:
         if not server:
             raise ValueError("Proxy server 地址不能为空")
+
+        if not server.startswith(('http://', 'https://', 'socks5://')):
+            raise ValueError(f"无效的代理协议: {server}")
 
         self.server = server
         self.username = username
@@ -24,10 +29,28 @@ class ProxyConfig:
         转换为 aiohttp 等需要的完整代理 URL
         有账号密码时拼接，没有时直接返回 server
         """
-        if self.username and self.password:
-            # 在 server 中插入认证信息
-            return self.server.replace("://", f"://{self.username}:{self.password}@")
-        return self.server
+        parsed = urlparse(self.server)
+        if self.username:
+            auth = quote(self.username)
+            if self.password:
+                auth += f":{quote(self.password)}"
+            netloc = f"{auth}@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            result=str(urlunparse((
+                parsed.scheme or '',
+                netloc,
+                parsed.path or '',
+                parsed.params or '',
+                parsed.query or '',
+                parsed.fragment or ''
+            )))
+            return result
+        else:
+            return str(self.server)
+
+    def __str__(self) -> str:
+        return self.to_url()
 
     def to_dict(self) -> Dict[str, str]:
         """
@@ -46,7 +69,10 @@ class ProxyConfig:
 
 
 class BaseScraperConfig:
-    """共有的配置"""
+    proxy: Optional[ProxyConfig]
+    user_agent: Optional[str]
+    headers: Dict[str, str]
+    timeout: int
 
     def __init__(
             self,

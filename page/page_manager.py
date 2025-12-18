@@ -185,13 +185,20 @@ class AsyncPageManager:
             return
 
         try:
+            # 先关闭所有上下文
+            for context_name in list(self.contexts.keys()):
+                await self.close_context(context_name)
+
             if self.browser:
                 await self.browser.close()
             if self.playwright:
                 await self.playwright.stop()
-            self._started = False
         except Exception as e:
             self.logger.error(f"关闭浏览器失败: {e}", exc_info=True)
+        finally:
+            self._started = False
+            self.contexts.clear()
+            self.pages.clear()
 
     @asynccontextmanager
     async def managed_page(self, page_name: str, url: Optional[str] = None, context_name: Optional[str] = None):

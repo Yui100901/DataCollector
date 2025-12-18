@@ -35,9 +35,10 @@ class PageCollector:
         if self.session:
             await self.session.close()
 
-    async def fetch(self, url: str, proxy: Optional[str] = None, headers: Optional[Dict[str, str]] = None) -> str:
+    async def fetch(self, url: str, proxy: Optional[ProxyConfig] = None,
+                    headers: Optional[Dict[str, str]] = None) -> str:
         if not self.session:
-            raise RuntimeError("ClientSession 未初始化，请用 async with PageCollector(...) 使用")
+            raise RuntimeError("ClientSession 未初始化,请用 async with PageCollector(...) 使用")
 
         merged_headers = dict(self.config.headers)
         if self.config.user_agent:
@@ -45,8 +46,11 @@ class PageCollector:
         if headers:
             merged_headers.update(headers)
 
-        default_proxy_url = self.config.proxy.to_url()
-        proxy_url = proxy or default_proxy_url
+        # 更准确的类型注解
+        default_proxy: Optional[str] = (
+            self.config.proxy.to_url() if isinstance(self.config.proxy, ProxyConfig) else None
+        )
+        proxy_url = proxy.to_url() if proxy else default_proxy
 
         async with self.session.get(url, proxy=proxy_url, headers=merged_headers) as response:
             response.raise_for_status()
