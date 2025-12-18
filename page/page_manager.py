@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright, Browser, BrowserContext
 import logging
 
 from base.browser_types import BrowserType
-from base.config import BaseScraperConfig
+from base.config import BaseScraperConfig, ProxyConfig
 from .page_operator import PageOperator
 
 class AsyncPageManagerConfig(BaseScraperConfig):
@@ -19,7 +19,7 @@ class AsyncPageManagerConfig(BaseScraperConfig):
             browser: BrowserType = BrowserType.CHROMIUM,
             default_context_name: str = "default",
             viewport: Optional[Dict[str, int]] = None,
-            proxy: Optional[Dict[str, str]] = None,
+            proxy: Optional[ProxyConfig] = None,
             user_agent: Optional[str] = None,
             headers: Optional[Dict[str, str]] = None,
             timeout: int = 3000
@@ -112,7 +112,7 @@ class AsyncPageManager:
         if timezone_id:
             context_options["timezone_id"] = timezone_id
         if proxy or self.config.proxy:
-            context_options["proxy"] = proxy or self.config.proxy
+            context_options["proxy"] = proxy or self.config.proxy.to_dict()
 
         context = await self.browser.new_context(**context_options)
         context.set_default_timeout(self.config.timeout)
