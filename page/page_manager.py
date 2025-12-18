@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright, Browser, BrowserContext
 import logging
 
-from .browser_types import BrowserType
-from .config import BaseScraperConfig
+from base.browser_types import BrowserType
+from base.config import BaseScraperConfig
 from .page_operator import PageOperator
 
 class AsyncPageManagerConfig(BaseScraperConfig):
