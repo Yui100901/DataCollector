@@ -215,7 +215,7 @@ class PageOperatorChain:
         return self
 
     # ===== 执行器 =====
-    async def run(self,ignore_errors: bool = False) -> "PageOperatorChain":
+    async def run(self,ignore_errors: bool = False,step_delay: Optional[int] = None) -> "PageOperatorChain":
         """按顺序执行所有收集的操作"""
         for task in self._tasks:
             try:
@@ -225,5 +225,7 @@ class PageOperatorChain:
                 if not ignore_errors:
                     raise
                 continue
+            if step_delay:
+                await self.page.wait_for_timeout(step_delay)
         self._tasks.clear()
         return self
