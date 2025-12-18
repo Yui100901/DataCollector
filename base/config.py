@@ -79,7 +79,7 @@ class BaseScraperConfig:
             proxy: Optional[ProxyConfig] = None,
             user_agent: Optional[str] = None,
             headers: Optional[Dict[str, str]] = None,
-            timeout: int = 3000
+            timeout: int = 30000
     ):
         self.proxy = proxy
         self.user_agent = user_agent

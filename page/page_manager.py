@@ -15,7 +15,7 @@ class AsyncPageManagerConfig(BaseScraperConfig):
 
     def __init__(
             self,
-            headless: bool = True,
+            headless: bool = False,
             browser: BrowserType = BrowserType.CHROMIUM,
             default_context_name: str = "default",
             viewport: Optional[Dict[str, int]] = None,
@@ -50,6 +50,20 @@ class AsyncPageManagerConfig(BaseScraperConfig):
             user_agent=base.user_agent,
             headers=base.headers,
             timeout=base.timeout
+        )
+
+    @classmethod
+    def default(cls) -> "AsyncPageManagerConfig":
+        """返回一份默认配置"""
+        return cls(
+            headless=False,
+            browser=BrowserType.CHROMIUM,
+            default_context_name="default",
+            viewport={"width": 1280, "height": 720},
+            proxy=None,
+            user_agent=None,
+            headers={},
+            timeout=30000
         )
 
 
