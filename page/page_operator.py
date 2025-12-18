@@ -75,11 +75,11 @@ class PageOperatorChain:
         self._tasks: List[Callable[[], Any]] = []
 
     # ===== 页面导航 =====
-    def goto(self, url: str, wait_until: Literal["commit","domcontentloaded","load","networkidle"] = "networkidle") -> "PageOperatorChain":
+    def goto(self, url: str, wait_until: Literal["commit","domcontentloaded","load","networkidle"] = "domcontentloaded") -> "PageOperatorChain":
         self._tasks.append(lambda: self.page.goto(url, wait_until=wait_until))
         return self
 
-    def reload(self, wait_until: Literal["commit","domcontentloaded","load","networkidle"] = "networkidle") -> "PageOperatorChain":
+    def reload(self, wait_until: Literal["commit","domcontentloaded","load","networkidle"] = "domcontentloaded") -> "PageOperatorChain":
         self._tasks.append(lambda: self.page.reload(wait_until=wait_until))
         return self
 
@@ -91,7 +91,7 @@ class PageOperatorChain:
         self._tasks.append(lambda: self.page.go_forward())
         return self
 
-    def wait_for_load(self, state: Literal["domcontentloaded","load","networkidle"] = "networkidle") -> "PageOperatorChain":
+    def wait_for_load(self, state: Literal["domcontentloaded","load","networkidle"] = "domcontentloaded") -> "PageOperatorChain":
         self._tasks.append(lambda: self.page.wait_for_load_state(state))
         return self
 
