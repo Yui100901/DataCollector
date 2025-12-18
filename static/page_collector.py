@@ -21,42 +21,35 @@ class PageCollectorConfig(BaseScraperConfig):
             timeout=timeout
         )
 
-
 class PageCollector:
     def __init__(self, config: PageCollectorConfig):
         self.config = config
+        self.session: aiohttp.ClientSession | None = None
+
+    async def __aenter__(self):
+        timeout = aiohttp.ClientTimeout(total=self.config.timeout / 1000)
+        self.session = aiohttp.ClientSession(headers=self.config.headers, timeout=timeout)
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self.session:
+            await self.session.close()
 
     async def fetch(self, url: str, proxy: Optional[str] = None, headers: Optional[Dict[str, str]] = None) -> str:
-        """异步爬取静态页面，支持为每个请求设置不同代理和 headers"""
-        timeout = aiohttp.ClientTimeout(total=self.config.timeout / 1000)
+        if not self.session:
+            raise RuntimeError("ClientSession 未初始化，请用 async with PageCollector(...) 使用")
 
-        # 合并 headers
         merged_headers = dict(self.config.headers)
         if self.config.user_agent:
             merged_headers["User-Agent"] = self.config.user_agent
         if headers:
             merged_headers.update(headers)
+
         default_proxy_url = self.config.proxy.to_url()
-        # 优先使用传入的代理，否则用配置里的默认代理
-        proxy_url = proxy or (default_proxy_url if default_proxy_url else None)
+        proxy_url = proxy or default_proxy_url
 
-        async with aiohttp.ClientSession(headers=merged_headers, timeout=timeout) as session:
-            async with session.get(url, proxy=proxy_url) as response:
-                response.raise_for_status()
-                return await response.text()
+        async with self.session.get(url, proxy=proxy_url, headers=merged_headers) as response:
+            response.raise_for_status()
+            return await response.text()
 
 
-async def main():
-    config = PageCollectorConfig(
-        user_agent="MyCustomAgent/1.0",
-        headers={"Authorization": "Bearer TOKEN"},
-        proxy=ProxyConfig(server="http://127.0.0.1:7890"),
-        timeout=5000
-    )
-    collector = PageCollector(config)
-    html = await collector.fetch("https://example.com")
-    print(html[:200])  # 打印前200字符
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
