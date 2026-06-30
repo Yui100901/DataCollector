@@ -133,9 +133,15 @@ class AgentRunner:
         if self.config.model.provider != "openai":
             raise ValueError(f"unsupported model provider: {self.config.model.provider}")
         if not self.config.model.api_key:
-            raise ValueError("OPENAI_API_KEY is required to run AI-controlled browser tasks")
+            raise ValueError(
+                "OPENAI_API_KEY is required. For OpenAI-compatible local services, "
+                "set it to any non-empty placeholder and configure OPENAI_BASE_URL."
+            )
 
-        client = AsyncOpenAI(api_key=self.config.model.api_key)
+        client = AsyncOpenAI(
+            api_key=self.config.model.api_key,
+            base_url=self.config.model.base_url,
+        )
         previous_response_id: str | None = None
         next_input: list[dict[str, Any]] | str = self._initial_input(task)
         final_text = ""

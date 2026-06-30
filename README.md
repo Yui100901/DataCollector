@@ -55,6 +55,32 @@ cp .env.example .env
 OPENAI_API_KEY=your_api_key
 ```
 
+默认情况下，`OPENAI_API_KEY` 会访问 OpenAI 官方 API。也可以指定任何 OpenAI-compatible 服务，例如本地 Ollama、LM Studio、vLLM、Xinference 等：
+
+```bash
+OPENAI_API_KEY=local-placeholder
+OPENAI_BASE_URL=http://localhost:11434/v1
+DATACOLLECTOR_MODEL=qwen2.5:7b
+```
+
+常见本地兼容服务示例：
+
+```bash
+# Ollama
+OPENAI_BASE_URL=http://localhost:11434/v1
+DATACOLLECTOR_MODEL=qwen2.5:7b
+
+# LM Studio
+OPENAI_BASE_URL=http://localhost:1234/v1
+DATACOLLECTOR_MODEL=local-model
+
+# vLLM
+OPENAI_BASE_URL=http://localhost:8000/v1
+DATACOLLECTOR_MODEL=Qwen/Qwen2.5-7B-Instruct
+```
+
+如果本地服务不校验 key，`OPENAI_API_KEY` 也需要设置成任意非空占位值，例如 `local-placeholder`。
+
 ## 使用
 
 推荐使用交互式模式：
