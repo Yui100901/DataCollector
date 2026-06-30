@@ -1,0 +1,16 @@
+{
+  "instruction": "打开页面并提取页面中的链接、列表和表格。",
+  "url": "https://example.com",
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "summary": { "type": "string" },
+      "links": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "required": ["summary", "links"]
+  }
+}
+

@@ -1,0 +1,22 @@
+[browser]
+headless = true
+# channel = "chrome"
+# executable_path = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+# storage_state = "state/storage.json"
+
+[model]
+provider = "openai"
+model = "gpt-4.1-mini"
+temperature = 0.2
+max_output_tokens = 1200
+
+[agent]
+max_steps = 12
+task_timeout_seconds = 120
+trace_enabled = true
+allowed_domains = []
+blocked_domains = []
+
+[runtime]
+output_dir = "runs"
+database_path = "runs/datacollector.sqlite3"
