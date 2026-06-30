@@ -2,7 +2,9 @@
 
 from datacollector.agent.models import RunResult, TaskMemory, TaskSpec
 from datacollector.agent.runner import AgentRunner
+from datacollector.artifacts import DataArtifact
 from datacollector.browser.runtime import BrowserRuntime
+from datacollector.chat import ChatSession
 from datacollector.config import AgentConfig, BrowserConfig, ModelConfig, RuntimeConfig
 
 __all__ = [
@@ -10,6 +12,8 @@ __all__ = [
     "AgentRunner",
     "BrowserConfig",
     "BrowserRuntime",
+    "ChatSession",
+    "DataArtifact",
     "ModelConfig",
     "RunResult",
     "RuntimeConfig",

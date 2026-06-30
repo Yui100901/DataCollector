@@ -1,8 +1,8 @@
 # DataCollector
 
-DataCollector 是一个由 AI 驱动 Playwright 的浏览器自动化运行时。
+DataCollector 是一个由 AI 驱动 Playwright 的交互式浏览器自动化助理。
 
-项目将从原来的简易爬虫框架，重新定义为一个可以接收自然语言任务、由 AI Agent 观察页面并调用 Playwright 工具执行操作的自动化工具。
+项目将从原来的简易爬虫框架，重新定义为一个可以多轮对话、理解上下文、调用浏览器工具、清洗数据并导出产物的自动化工具。
 
 ## 当前目标
 
@@ -12,7 +12,8 @@ P0 阶段目标：
 - 使用 Playwright async Python 作为浏览器运行时。
 - 使用 OpenAI Responses API 作为第一版工具调用接口。
 - 以 Pydantic 模型定义任务、步骤、配置和运行结果。
-- 提供 `dc` CLI 入口运行自然语言浏览器任务。
+- 提供 `dc chat` 入口进行交互式问答。
+- 保留 `dc run` 作为一次性任务执行入口。
 
 ## 技术栈
 
@@ -22,6 +23,8 @@ P0 阶段目标：
 - Pydantic v2
 - Pydantic AI
 - Typer
+- openpyxl
+- reportlab
 - uv
 
 ## 安装
@@ -34,7 +37,7 @@ uv run playwright install
 如果 Playwright 浏览器下载较慢，也可以直接使用本机已安装的 Chrome 或 Edge：
 
 ```bash
-uv run dc run "打开 example.com 并总结页面内容" \
+uv run dc chat "打开 example.com 并总结页面内容" \
   --url https://example.com \
   --headless \
   --browser-executable "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
@@ -54,17 +57,41 @@ OPENAI_API_KEY=your_api_key
 
 ## 使用
 
+推荐使用交互式模式：
+
 ```bash
-uv run dc run "打开 example.com 并总结页面内容" --url https://example.com --headed
+uv run dc chat --headless --browser-executable "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 ```
 
-或使用无头模式：
+进入后可以直接对话：
+
+```text
+你: 搜索关键词：Playwright AI 自动化，帮我整理前 5 条结果
+AI: ...
+
+你: 继续找和 Python 相关的结果
+AI: ...
+
+你: 导出 Excel 和 Markdown
+AI: 已导出：...
+```
+
+也可以带第一条消息启动：
+
+```bash
+uv run dc chat "搜索关键词：Playwright AI 自动化，整理前 5 条结果" \
+  --url https://www.bing.com \
+  --headless \
+  --browser-executable "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+```
+
+会话会保存在 `runs/chat/<session_id>/`，包含对话历史、清洗后的 dataset 和导出的产物。
+
+一次性任务仍然可以用 `dc run`：
 
 ```bash
 uv run dc run "打开 example.com 并总结页面内容" --url https://example.com --headless
 ```
-
-运行结果会输出到终端，并在 `runs/` 目录保存 `result.json`、页面观察截图和执行产物。
 
 ## P1 能力
 
@@ -124,6 +151,23 @@ uv sync --extra dev
 uv run pytest -q
 uv run ruff check datacollector tests examples
 ```
+
+## 交互式产物
+
+`dc chat` 会把浏览器提取到的链接、列表、表格和媒体资源沉淀为结构化 dataset，并进行基础清洗：
+
+- 去除空值。
+- 统一空白字符。
+- 去重。
+- 将链接、列表项、表格行整理成统一行数据。
+
+当前支持导出：
+
+- Excel：`.xlsx`
+- Markdown：`.md`
+- PDF：`.pdf`
+- CSV：`.csv`
+- JSON：`.json`
 
 ## 需求文档
 
