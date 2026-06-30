@@ -31,6 +31,14 @@ DataCollector 将从一个基于 Playwright 的简易爬虫框架，重新定义
 - [x] 支持导出 Excel、Markdown、PDF、CSV、JSON。
 - [x] 保留一次性 `run` 入口作为底层执行能力。
 
+## 下一阶段重新评估
+
+P0/P1/P2 已完成后，项目的主要矛盾已经变化：下一步不应继续堆工具数量，而应让 `dc chat` 成为真正持续的浏览器会话，并补齐本地 OpenAI-compatible 模型适配。
+
+详细路线见：
+
+- [next-roadmap.md](next-roadmap.md)
+
 ## P0 - 基础能力 / MVP 阻塞项
 
 ### 产品范围

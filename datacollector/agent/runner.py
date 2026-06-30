@@ -35,10 +35,23 @@ class AgentRunner:
         self.config = config or RuntimeConfig.from_env()
 
     async def run(self, task: TaskSpec) -> RunResult:
+        async with BrowserRuntime(self.config.browser) as runtime:
+            return await self.run_with_runtime(task, runtime)
+
+    async def run_with_runtime(
+        self,
+        task: TaskSpec,
+        runtime: BrowserRuntime,
+        artifact_parent: Path | None = None,
+    ) -> RunResult:
+        if not runtime.browser:
+            await runtime.start()
+
         started_at = datetime.now()
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid4().hex[:8]
-        artifact_dir = self.config.output_dir / run_id
+        artifact_dir = (artifact_parent or self.config.output_dir) / run_id
         artifact_dir.mkdir(parents=True, exist_ok=True)
+
         logger = RunLogger(artifact_dir)
         logger.write_metadata(
             {
@@ -53,56 +66,57 @@ class AgentRunner:
         steps: list[StepRecord] = []
         memory = TaskMemory(goal=task.instruction)
         safety = SafetyGuard(self.config.agent)
-        async with BrowserRuntime(self.config.browser) as runtime:
-            tools = BrowserToolRegistry(runtime, artifact_dir, safety)
-            trace_path = artifact_dir / "trace.zip"
-            tracing_started = False
-            if self.config.agent.trace_enabled:
-                try:
-                    await runtime.start_tracing()
-                    tracing_started = True
-                    logger.event("trace_started")
-                except Exception as exc:
-                    logger.event("trace_start_failed", error=f"{type(exc).__name__}: {exc}")
-            if task.url:
-                navigation_safety = safety.check_navigation(task.url)
-                if not navigation_safety.allowed:
-                    finished_at = datetime.now()
-                    result = RunResult(
-                        run_id=run_id,
-                        success=False,
-                        task=task,
-                        started_at=started_at,
-                        finished_at=finished_at,
-                        steps=steps,
-                        memory=memory,
-                        final_message=navigation_safety.reason,
-                        artifact_dir=str(artifact_dir),
-                        artifacts=logger.artifacts,
-                    )
-                    self._finalize_result(result, logger)
-                    return result
-                await runtime.require_page().goto(task.url, wait_until="domcontentloaded")
+        tools = BrowserToolRegistry(runtime, artifact_dir, safety)
 
+        trace_path = artifact_dir / "trace.zip"
+        tracing_started = False
+        if self.config.agent.trace_enabled:
             try:
-                final_message = await asyncio.wait_for(
-                    self._run_loop(task, runtime, tools, steps, memory, artifact_dir, logger),
-                    timeout=self.config.agent.task_timeout_seconds,
-                )
-                success = True
+                await runtime.start_tracing()
+                tracing_started = True
+                logger.event("trace_started")
             except Exception as exc:
-                final_message = f"任务失败: {type(exc).__name__}: {exc}"
-                memory.failures.append(final_message)
-                logger.event("run_failed", error=final_message)
-                success = False
-            finally:
-                if tracing_started:
-                    try:
-                        await runtime.stop_tracing(trace_path)
-                        logger.artifact("trace", trace_path, "Playwright trace")
-                        logger.event("trace_saved", path=str(trace_path))
-                    except Exception as exc:
-                        logger.event("trace_save_failed", error=f"{type(exc).__name__}: {exc}")
+                logger.event("trace_start_failed", error=f"{type(exc).__name__}: {exc}")
+
+        if task.url:
+            navigation_safety = safety.check_navigation(task.url)
+            if not navigation_safety.allowed:
+                finished_at = datetime.now()
+                result = RunResult(
+                    run_id=run_id,
+                    success=False,
+                    task=task,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    steps=steps,
+                    memory=memory,
+                    final_message=navigation_safety.reason,
+                    artifact_dir=str(artifact_dir),
+                    artifacts=logger.artifacts,
+                )
+                self._finalize_result(result, logger)
+                return result
+            await runtime.require_page().goto(task.url, wait_until="domcontentloaded")
+
+        try:
+            final_message = await asyncio.wait_for(
+                self._run_loop(task, runtime, tools, steps, memory, artifact_dir, logger),
+                timeout=self.config.agent.task_timeout_seconds,
+            )
+            success = True
+        except Exception as exc:
+            final_message = f"任务失败: {type(exc).__name__}: {exc}"
+            memory.failures.append(final_message)
+            logger.event("run_failed", error=final_message)
+            success = False
+        finally:
+            if tracing_started:
+                try:
+                    await runtime.stop_tracing(trace_path)
+                    logger.artifact("trace", trace_path, "Playwright trace")
+                    logger.event("trace_saved", path=str(trace_path))
+                except Exception as exc:
+                    logger.event("trace_save_failed", error=f"{type(exc).__name__}: {exc}")
 
         finished_at = datetime.now()
         result = RunResult(
@@ -330,3 +344,4 @@ class AgentRunner:
         )
         database_path = self.config.database_path or (self.config.output_dir / "datacollector.sqlite3")
         SQLiteRunStore(database_path).save_run(result)
+

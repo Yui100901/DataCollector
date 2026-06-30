@@ -54,27 +54,36 @@ def chat(
         config.output_dir = output
 
     session = ChatSession(config)
-    typer.echo(f"DataCollector Chat 已启动，会话目录：{session.session_dir}")
-    typer.echo("直接输入需求即可；输入 /exit 退出；输入“导出 Excel/Markdown/PDF”可生成产物。")
 
-    async def handle(message: str, message_url: str | None = None) -> None:
-        reply = await session.ask(message, url=message_url)
-        typer.echo(f"\nAI: {reply.message}\n")
-        if reply.exports:
-            for item in reply.exports:
-                typer.echo(f"- {item.format}: {item.path}")
+    async def chat_loop() -> None:
+        await session.start()
+        typer.echo(f"DataCollector Chat 已启动，会话目录：{session.session_dir}")
+        typer.echo("直接输入需求即可；输入 /help 查看命令；输入 /exit 退出。")
 
-    if initial_message:
-        asyncio.run(handle(initial_message, url))
-        url = None
+        async def handle(message: str, message_url: str | None = None) -> None:
+            reply = await session.ask(message, url=message_url)
+            typer.echo(f"\nAI: {reply.message}\n")
+            if reply.exports:
+                for item in reply.exports:
+                    typer.echo(f"- {item.format}: {item.path}")
 
-    while True:
-        message = typer.prompt("你")
-        if message.strip().lower() in {"/exit", "exit", "quit", "q"}:
-            typer.echo(f"会话已保存：{session.session_dir}")
-            break
-        asyncio.run(handle(message, url))
-        url = None
+        try:
+            first_url = url
+            if initial_message:
+                await handle(initial_message, first_url)
+                first_url = None
+
+            while True:
+                message = typer.prompt("你")
+                if message.strip().lower() in {"/exit", "exit", "quit", "q"}:
+                    typer.echo(f"会话已保存：{session.session_dir}")
+                    break
+                await handle(message, first_url)
+                first_url = None
+        finally:
+            await session.close()
+
+    asyncio.run(chat_loop())
 
 
 @app.command()
@@ -154,4 +163,3 @@ def show_run(
     if not row:
         raise typer.Exit(1)
     typer.echo(json.dumps(row, ensure_ascii=False, indent=2))
-
