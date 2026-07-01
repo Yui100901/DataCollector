@@ -114,17 +114,17 @@
 
 目标：真正支持 OpenAI 官方和本地 OpenAI-compatible 模型。
 
-- [ ] 新增 `ModelClient` 抽象。
-- [ ] 新增 `ResponsesModelClient`，用于 OpenAI Responses API。
-- [ ] 新增 `ChatCompletionsModelClient`，用于 `/v1/chat/completions`。
-- [ ] 配置项增加 `model.api_style`，可选 `responses` / `chat_completions`。
-- [ ] 对本地模型提供默认配置示例：
+- [x] 新增 `ModelClient` 抽象。
+- [x] 新增 `ResponsesModelClient`，用于 OpenAI Responses API。
+- [x] 新增 `ChatCompletionsModelClient`，用于 `/v1/chat/completions`。
+- [x] 配置项增加 `model.api_style`，可选 `responses` / `chat_completions`。
+- [x] 对本地模型提供默认配置示例：
   - Ollama
   - LM Studio
   - vLLM
   - Xinference
 - [ ] 如果模型不支持工具调用，给出清晰错误。
-- [ ] 增加 mock 测试覆盖两种协议。
+- [x] 增加 mock 测试覆盖两种协议。
 
 验收标准：
 

@@ -61,6 +61,7 @@ OPENAI_API_KEY=your_api_key
 OPENAI_API_KEY=local-placeholder
 OPENAI_BASE_URL=http://localhost:11434/v1
 DATACOLLECTOR_MODEL=qwen2.5:7b
+DATACOLLECTOR_MODEL_API_STYLE=chat_completions
 ```
 
 常见本地兼容服务示例：
@@ -69,17 +70,25 @@ DATACOLLECTOR_MODEL=qwen2.5:7b
 # Ollama
 OPENAI_BASE_URL=http://localhost:11434/v1
 DATACOLLECTOR_MODEL=qwen2.5:7b
+DATACOLLECTOR_MODEL_API_STYLE=chat_completions
 
 # LM Studio
 OPENAI_BASE_URL=http://localhost:1234/v1
 DATACOLLECTOR_MODEL=local-model
+DATACOLLECTOR_MODEL_API_STYLE=chat_completions
 
 # vLLM
 OPENAI_BASE_URL=http://localhost:8000/v1
 DATACOLLECTOR_MODEL=Qwen/Qwen2.5-7B-Instruct
+DATACOLLECTOR_MODEL_API_STYLE=chat_completions
 ```
 
 如果本地服务不校验 key，`OPENAI_API_KEY` 也需要设置成任意非空占位值，例如 `local-placeholder`。
+
+`DATACOLLECTOR_MODEL_API_STYLE` 可选：
+
+- `responses`：OpenAI Responses API，默认值。
+- `chat_completions`：OpenAI-compatible `/v1/chat/completions`，多数本地模型服务使用这个。
 
 ## 使用
 

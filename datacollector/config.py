@@ -83,6 +83,7 @@ class BrowserConfig(BaseModel):
 class ModelConfig(BaseModel):
     provider: str = "openai"
     model: str = "gpt-4.1-mini"
+    api_style: str = "responses"
     temperature: float = 0.2
     max_output_tokens: int = 1200
     api_key: str | None = None
@@ -136,6 +137,7 @@ class RuntimeConfig(BaseModel):
                 or os.getenv("OPENAPI_URL")
                 or None,
                 model=os.getenv("DATACOLLECTOR_MODEL", "gpt-4.1-mini"),
+                api_style=os.getenv("DATACOLLECTOR_MODEL_API_STYLE", "responses"),
                 temperature=float(os.getenv("DATACOLLECTOR_TEMPERATURE", "0.2")),
                 max_output_tokens=int(os.getenv("DATACOLLECTOR_MAX_OUTPUT_TOKENS", "1200")),
             ),
@@ -176,7 +178,15 @@ class RuntimeConfig(BaseModel):
             config.browser.downloads_path = Path(browser["downloads_path"])
 
         model = data.get("model", {})
-        for field in ("provider", "model", "temperature", "max_output_tokens", "api_key", "base_url"):
+        for field in (
+            "provider",
+            "model",
+            "api_style",
+            "temperature",
+            "max_output_tokens",
+            "api_key",
+            "base_url",
+        ):
             if field in model:
                 setattr(config.model, field, model[field])
 
