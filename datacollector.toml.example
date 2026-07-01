@@ -3,6 +3,7 @@ headless = true
 # channel = "chrome"
 # executable_path = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 # storage_state = "state/storage.json"
+auto_save_storage_state = true
 
 [model]
 provider = "openai"

@@ -154,24 +154,51 @@ class ChatCompletionsModelClient(ModelClient):
             temperature=self.config.temperature,
             max_tokens=self.config.max_output_tokens,
         )
-        message = response.choices[0].message
+        message = self._extract_message(response)
         self.messages.append(self._assistant_message_for_history(message))
         return ModelTurn(
-            text=str(getattr(message, "content", "") or ""),
+            text=str(self._get(message, "content", "") or ""),
             tool_calls=self._extract_tool_calls(message),
         )
 
+    def _extract_message(self, response: Any) -> Any:
+        normalized = self._normalize_response(response)
+        choices = self._get(normalized, "choices", None)
+        if not isinstance(choices, list) or not choices:
+            raise RuntimeError(
+                "模型服务返回缺少 choices 字段，无法按 Chat Completions 解析。"
+                "请确认 OPENAI_BASE_URL 指向兼容接口，通常需要以 /v1 结尾；"
+                f"当前 base_url={self.config.base_url!r}。"
+            )
+        message = self._get(choices[0], "message", None)
+        if message is None:
+            raise RuntimeError("模型服务返回的 choices[0] 缺少 message 字段。")
+        return message
+
+    def _normalize_response(self, response: Any) -> Any:
+        if isinstance(response, str):
+            try:
+                return json.loads(response)
+            except json.JSONDecodeError as exc:
+                preview = response.replace("\n", " ")[:200]
+                raise RuntimeError(
+                    "模型服务返回了非 JSON 文本，无法按 Chat Completions 解析。"
+                    "这通常表示 OPENAI_BASE_URL 指向了网关首页或缺少 /v1；"
+                    f"当前 base_url={self.config.base_url!r}，响应开头={preview!r}。"
+                ) from exc
+        return response
+
     def _extract_tool_calls(self, message: Any) -> list[ToolCall]:
         calls: list[ToolCall] = []
-        for item in getattr(message, "tool_calls", None) or []:
-            function = getattr(item, "function", None)
+        for item in self._get(message, "tool_calls", None) or []:
+            function = self._get(item, "function", None)
             if not function:
                 continue
             calls.append(
                 ToolCall(
-                    call_id=getattr(item, "id", ""),
-                    name=getattr(function, "name", ""),
-                    arguments=self._loads_arguments(getattr(function, "arguments", "{}") or "{}"),
+                    call_id=self._get(item, "id", ""),
+                    name=self._get(function, "name", ""),
+                    arguments=self._loads_arguments(self._get(function, "arguments", "{}") or "{}"),
                 )
             )
         return calls
@@ -179,20 +206,20 @@ class ChatCompletionsModelClient(ModelClient):
     def _assistant_message_for_history(self, message: Any) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "role": "assistant",
-            "content": getattr(message, "content", None),
+            "content": self._get(message, "content", None),
         }
         tool_calls = []
-        for item in getattr(message, "tool_calls", None) or []:
-            function = getattr(item, "function", None)
+        for item in self._get(message, "tool_calls", None) or []:
+            function = self._get(item, "function", None)
             if not function:
                 continue
             tool_calls.append(
                 {
-                    "id": getattr(item, "id", ""),
+                    "id": self._get(item, "id", ""),
                     "type": "function",
                     "function": {
-                        "name": getattr(function, "name", ""),
-                        "arguments": getattr(function, "arguments", "{}") or "{}",
+                        "name": self._get(function, "name", ""),
+                        "arguments": self._get(function, "arguments", "{}") or "{}",
                     },
                 }
             )
@@ -211,7 +238,15 @@ class ChatCompletionsModelClient(ModelClient):
         }
 
     @staticmethod
-    def _loads_arguments(value: str) -> dict[str, Any]:
+    def _get(value: Any, key: str, default: Any = None) -> Any:
+        if isinstance(value, dict):
+            return value.get(key, default)
+        return getattr(value, key, default)
+
+    @staticmethod
+    def _loads_arguments(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
         try:
             parsed = json.loads(value)
         except json.JSONDecodeError:
@@ -225,4 +260,3 @@ def create_model_client(config: ModelConfig, system_prompt: str) -> ModelClient:
     if config.api_style == "chat_completions":
         return ChatCompletionsModelClient(config, system_prompt)
     raise ValueError(f"unsupported model api_style: {config.api_style}")
-

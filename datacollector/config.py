@@ -71,6 +71,7 @@ class BrowserConfig(BaseModel):
     accept_downloads: bool = True
     downloads_path: Path | None = None
     storage_state: Path | None = None
+    auto_save_storage_state: bool = True
     viewport: dict[str, int] = Field(default_factory=lambda: {"width": 1280, "height": 720})
     user_agent: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
@@ -111,6 +112,8 @@ class RuntimeConfig(BaseModel):
         headless = os.getenv("DATACOLLECTOR_HEADLESS", "false").lower() in {"1", "true", "yes"}
         allowed_domains = cls._split_env_list(os.getenv("DATACOLLECTOR_ALLOWED_DOMAINS", ""))
         blocked_domains = cls._split_env_list(os.getenv("DATACOLLECTOR_BLOCKED_DOMAINS", ""))
+        output_dir = Path(os.getenv("DATACOLLECTOR_OUTPUT_DIR", "runs"))
+        storage_state = cls._storage_state_from_env(output_dir)
         executable_path = os.getenv("DATACOLLECTOR_BROWSER_EXECUTABLE") or None
         if not executable_path:
             executable_path = cls._detect_system_browser()
@@ -119,9 +122,9 @@ class RuntimeConfig(BaseModel):
                 headless=headless,
                 channel=os.getenv("DATACOLLECTOR_BROWSER_CHANNEL") or None,
                 executable_path=executable_path,
-                storage_state=Path(os.getenv("DATACOLLECTOR_STORAGE_STATE"))
-                if os.getenv("DATACOLLECTOR_STORAGE_STATE")
-                else None,
+                storage_state=storage_state,
+                auto_save_storage_state=os.getenv("DATACOLLECTOR_AUTO_SAVE_STORAGE", "true").lower()
+                in {"1", "true", "yes"},
             ),
             model=ModelConfig(
                 api_key=(
@@ -149,7 +152,7 @@ class RuntimeConfig(BaseModel):
                 trace_enabled=os.getenv("DATACOLLECTOR_TRACE", "true").lower()
                 in {"1", "true", "yes"},
             ),
-            output_dir=Path(os.getenv("DATACOLLECTOR_OUTPUT_DIR", "runs")),
+            output_dir=output_dir,
             database_path=Path(os.getenv("DATACOLLECTOR_DATABASE"))
             if os.getenv("DATACOLLECTOR_DATABASE")
             else None,
@@ -166,6 +169,7 @@ class RuntimeConfig(BaseModel):
             "channel",
             "executable_path",
             "accept_downloads",
+            "auto_save_storage_state",
             "locale",
             "timezone_id",
             "timeout_ms",
@@ -218,6 +222,21 @@ class RuntimeConfig(BaseModel):
     @staticmethod
     def _split_env_list(value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
+
+    @staticmethod
+    def _storage_state_from_env(output_dir: Path) -> Path | None:
+        value = os.getenv("DATACOLLECTOR_STORAGE_STATE")
+        if value:
+            if value.lower() in {"0", "false", "no", "off", "none"}:
+                return None
+            return Path(value)
+        if os.getenv("DATACOLLECTOR_DISABLE_STORAGE_CACHE", "false").lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            return None
+        return output_dir / "browser-state" / "storage-state.json"
 
     @staticmethod
     def _detect_system_browser() -> str | None:

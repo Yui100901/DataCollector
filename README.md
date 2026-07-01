@@ -125,6 +125,26 @@ AI: 已导出：...
 
 `dc chat` 会在同一个浏览器 page/context 中持续工作，所以可以先登录，再继续搜索、提取和导出。
 
+如果页面出现登录、人机验证、Cloudflare/安全验证等需要人工处理的状态，DataCollector 会暂停自动操作并在控制台提示你处理，避免反复刷新或重复进入页面。
+完成登录或验证后，回到控制台输入“继续”或下一步需求即可。
+
+登录态默认会缓存到 `runs/browser-state/storage-state.json`，下次运行会自动复用，减少重复登录。
+也可以手动保存/加载：
+
+```text
+/save-state              保存到默认登录态缓存
+/save-state state/a.json 保存到指定路径
+/load-state state/a.json 加载指定登录态并重启浏览器会话
+```
+
+如需关闭默认登录态缓存：
+
+```bash
+DATACOLLECTOR_STORAGE_STATE=off
+# 或
+DATACOLLECTOR_DISABLE_STORAGE_CACHE=true
+```
+
 也可以带第一条消息启动：
 
 ```bash

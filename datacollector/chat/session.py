@@ -152,18 +152,15 @@ class ChatSession:
         if command == "/save-state":
             await self.start()
             assert self.runtime is not None
-            path = Path(argument) if argument else self.session_dir / "storage-state.json"
-            if not path.is_absolute():
-                path = self.session_dir / path
+            path = Path(argument) if argument else self._default_storage_state_path()
             await self.runtime.save_storage_state(path)
+            self.config.browser.storage_state = path
             return ChatReply(message=f"登录态已保存：{path}")
 
         if command == "/load-state":
             if not argument:
                 return ChatReply(message="用法：/load-state <path>")
             path = Path(argument)
-            if not path.is_absolute():
-                path = self.session_dir / path
             self.config.browser.storage_state = path
             await self.reset()
             return ChatReply(message=f"已加载登录态并重启浏览器会话：{path}")
@@ -217,6 +214,9 @@ class ChatSession:
     def _append(self, role: str, content: str) -> None:
         self.history.append(ChatMessage(role=role, content=content))
 
+    def _default_storage_state_path(self) -> Path:
+        return self.config.browser.storage_state or self.config.output_dir / "browser-state" / "storage-state.json"
+
     def _parse_export_request(self, text: str) -> list[str]:
         lowered = text.lower()
         if not any(keyword in lowered for keyword in ("导出", "export", "生成", "保存")):
@@ -261,4 +261,3 @@ class ChatSession:
             "/load-state <path> 加载登录态并重启会话\n"
             "/exit 退出 CLI"
         )
-

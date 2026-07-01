@@ -102,7 +102,7 @@ class AgentRunner:
                 self._run_loop(task, runtime, tools, steps, memory, artifact_dir, logger),
                 timeout=self.config.agent.task_timeout_seconds,
             )
-            success = True
+            success = not any(step.status == "requires_human_intervention" for step in steps)
         except Exception as exc:
             final_message = f"任务失败: {type(exc).__name__}: {exc}"
             memory.failures.append(final_message)
@@ -146,7 +146,7 @@ class AgentRunner:
         if self.config.model.provider != "openai":
             raise ValueError(f"unsupported model provider: {self.config.model.provider}")
 
-        model_client = create_model_client(self.config.model, SYSTEM_PROMPT)
+        model_client = None
         pending_tool_outputs: list[ToolOutput] = []
         initial_input = self._initial_input(task)
         final_text = ""
@@ -161,7 +161,31 @@ class AgentRunner:
                 url=observation.url,
                 title=observation.title,
                 screenshot_path=str(screenshot_path),
+                human_intervention=observation.human_intervention.model_dump(mode="json")
+                if observation.human_intervention
+                else None,
             )
+            if observation.human_intervention:
+                message = self._human_intervention_message(observation)
+                steps.append(
+                    StepRecord(
+                        index=index,
+                        observation=observation,
+                        assistant_message=message,
+                        status="requires_human_intervention",
+                    )
+                )
+                memory.failures.append(message)
+                logger.event(
+                    "human_intervention_required",
+                    step=index,
+                    category=observation.human_intervention.category,
+                    reason=observation.human_intervention.reason,
+                    url=observation.url,
+                )
+                return message
+            if model_client is None:
+                model_client = create_model_client(self.config.model, SYSTEM_PROMPT)
             user_text = self._build_turn_input(
                 initial_input=initial_input,
                 task=task,
@@ -198,9 +222,9 @@ class AgentRunner:
                     result=result.model_dump(mode="json"),
                 )
                 if result.screenshot_path:
-                    logger.artifact("screenshot", result.screenshot_path, f"{call['name']} screenshot")
+                    logger.artifact("screenshot", result.screenshot_path, f"{call.name} screenshot")
                 if "path" in result.data:
-                    logger.artifact(call["name"], result.data["path"], result.message)
+                    logger.artifact(call.name, result.data["path"], result.message)
                 steps.append(
                     StepRecord(
                         index=index,
@@ -266,6 +290,23 @@ class AgentRunner:
             f"{element.index}: <{element.tag}> role={element.role} type={element.type} "
             f"selector={element.selector_hint} text=\"{element.text}\" href=\"{element.href}\""
         )
+
+    def _human_intervention_message(self, observation: Any) -> str:
+        intervention = observation.human_intervention
+        category = "登录" if intervention.category == "login" else "人机/安全验证"
+        hints = [
+            f"检测到当前页面需要人工处理：{category}。",
+            f"原因：{intervention.reason}",
+            f"当前页面：{observation.url}",
+            "我已经暂停自动操作，避免反复刷新或重复进入页面。",
+            "请在已打开的浏览器窗口中完成登录或验证，完成后回到控制台输入“继续”或你的下一步需求。",
+            "登录态会自动保存到 storage state，下次启动会优先复用，减少重复登录。",
+        ]
+        if self.config.browser.headless:
+            hints.append("当前是无头模式；如需手动处理，请用 --headed 或不要传 --headless 启动。")
+        if intervention.evidence:
+            hints.append("检测依据：" + ", ".join(intervention.evidence[:5]))
+        return "\n".join(hints)
 
     def _remember_extracted_data(
         self,

@@ -38,6 +38,13 @@ class TableSummary(BaseModel):
     sample_rows: list[list[str]] = Field(default_factory=list)
 
 
+class HumanIntervention(BaseModel):
+    category: str
+    reason: str
+    confidence: float = 1.0
+    evidence: list[str] = Field(default_factory=list)
+
+
 class PageObservation(BaseModel):
     url: str
     title: str
@@ -47,6 +54,7 @@ class PageObservation(BaseModel):
     links: list[PageLink] = Field(default_factory=list)
     tables: list[TableSummary] = Field(default_factory=list)
     screenshot_path: str | None = None
+    human_intervention: HumanIntervention | None = None
 
 
 class BrowserRuntime:
@@ -86,6 +94,8 @@ class BrowserRuntime:
     async def stop(self) -> None:
         try:
             if self.context:
+                if self.config.auto_save_storage_state and self.config.storage_state:
+                    await self.save_storage_state(self.config.storage_state)
                 await self.context.close()
             if self.browser:
                 await self.browser.close()
@@ -121,7 +131,7 @@ class BrowserRuntime:
         if not self.browser:
             raise BrowserRuntimeError("browser runtime has not been started")
         options = self._context_options()
-        if storage_state:
+        if storage_state and Path(storage_state).exists():
             options["storage_state"] = str(storage_state)
         context = await self.browser.new_context(**options)
         context.set_default_timeout(self.config.timeout_ms)
@@ -187,6 +197,12 @@ class BrowserRuntime:
         interactive_elements = await self._interactive_elements(page)
         links = await self._links(page)
         tables = await self._tables(page)
+        human_intervention = await self._detect_human_intervention(
+            page=page,
+            title=title,
+            text=text,
+            interactive_elements=interactive_elements,
+        )
         return PageObservation(
             url=page.url,
             title=title,
@@ -196,6 +212,7 @@ class BrowserRuntime:
             links=links,
             tables=tables,
             screenshot_path=str(screenshot_path) if screenshot_path else None,
+            human_intervention=human_intervention,
         )
 
     def _context_options(self) -> dict[str, Any]:
@@ -212,9 +229,135 @@ class BrowserRuntime:
             options["locale"] = self.config.locale
         if self.config.timezone_id:
             options["timezone_id"] = self.config.timezone_id
-        if self.config.storage_state:
+        if self.config.storage_state and self.config.storage_state.exists():
             options["storage_state"] = str(self.config.storage_state)
         return options
+
+    async def _detect_human_intervention(
+        self,
+        page: Page,
+        title: str,
+        text: str,
+        interactive_elements: list[InteractiveElement],
+    ) -> HumanIntervention | None:
+        signals = await self._page_auth_signals(page)
+        combined_parts = [
+            page.url,
+            title,
+            text[:4000],
+            " ".join(element.text for element in interactive_elements[:30]),
+            " ".join(signals.get("iframe_text", [])),
+        ]
+        combined = " ".join(combined_parts).lower()
+
+        verification_keywords = {
+            "captcha",
+            "recaptcha",
+            "hcaptcha",
+            "turnstile",
+            "cf-challenge",
+            "cloudflare",
+            "checking your browser",
+            "verify you are human",
+            "verify that you are human",
+            "human verification",
+            "unusual traffic",
+            "security check",
+            "访问前验证",
+            "人机验证",
+            "安全验证",
+            "请完成验证",
+            "验证您是真人",
+            "验证你是真人",
+            "滑块验证",
+            "拖动滑块",
+            "验证码",
+        }
+        verification_hits = sorted(keyword for keyword in verification_keywords if keyword in combined)
+        if verification_hits or signals.get("verification_widgets", 0) > 0:
+            evidence = verification_hits or ["verification widget"]
+            return HumanIntervention(
+                category="human_verification",
+                reason="页面需要人机验证或安全验证，自动化应暂停等待人工处理。",
+                evidence=evidence[:8],
+            )
+
+        parsed = urlparse(page.url)
+        login_path_markers = {
+            "login",
+            "signin",
+            "sign-in",
+            "sso",
+            "oauth",
+            "auth",
+            "account",
+            "passport",
+        }
+        login_text_markers = {
+            "login",
+            "log in",
+            "sign in",
+            "password",
+            "账号",
+            "账户",
+            "登录",
+            "登入",
+            "密码",
+            "手机号",
+            "邮箱",
+        }
+        path = (parsed.path or "").lower()
+        login_path_hit = any(marker in path for marker in login_path_markers)
+        login_text_hits = sorted(marker for marker in login_text_markers if marker in combined)
+        password_inputs = int(signals.get("password_inputs", 0))
+
+        if password_inputs > 0 or (login_path_hit and login_text_hits):
+            evidence = [f"password_inputs={password_inputs}"] if password_inputs else []
+            if login_path_hit:
+                evidence.append(f"path={parsed.path}")
+            evidence.extend(login_text_hits[:6])
+            return HumanIntervention(
+                category="login",
+                reason="页面需要登录，自动化应暂停等待人工登录。",
+                evidence=evidence[:8],
+            )
+
+        return None
+
+    async def _page_auth_signals(self, page: Page) -> dict[str, Any]:
+        script = """
+        () => {
+          const visible = (el) => {
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return rect.width > 0 && rect.height > 0
+              && style.visibility !== 'hidden'
+              && style.display !== 'none';
+          };
+          const passwordInputs = Array.from(
+            document.querySelectorAll('input[type="password"]')
+          ).filter(visible).length;
+          const iframeText = Array.from(document.querySelectorAll('iframe')).map((frame) => [
+            frame.src || '',
+            frame.title || '',
+            frame.name || '',
+            frame.id || '',
+          ].join(' '));
+          const verificationWidgets = Array.from(document.querySelectorAll(
+            '[class*="captcha" i], [id*="captcha" i], [class*="recaptcha" i],'
+            + ' [id*="recaptcha" i], [class*="hcaptcha" i], [id*="hcaptcha" i],'
+            + ' [class*="turnstile" i], [id*="turnstile" i], [data-sitekey]'
+          )).filter(visible).length;
+          return { password_inputs: passwordInputs, iframe_text: iframeText, verification_widgets: verificationWidgets };
+        }
+        """
+        try:
+            value = await page.evaluate(script)
+        except Exception:
+            return {"password_inputs": 0, "iframe_text": [], "verification_widgets": 0}
+        if not isinstance(value, dict):
+            return {"password_inputs": 0, "iframe_text": [], "verification_widgets": 0}
+        return value
 
     async def _visible_text(self, page: Page, limit: int = 6000) -> str:
         try:
