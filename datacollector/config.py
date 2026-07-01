@@ -110,19 +110,30 @@ class RuntimeConfig(BaseModel):
         headless = os.getenv("DATACOLLECTOR_HEADLESS", "false").lower() in {"1", "true", "yes"}
         allowed_domains = cls._split_env_list(os.getenv("DATACOLLECTOR_ALLOWED_DOMAINS", ""))
         blocked_domains = cls._split_env_list(os.getenv("DATACOLLECTOR_BLOCKED_DOMAINS", ""))
+        executable_path = os.getenv("DATACOLLECTOR_BROWSER_EXECUTABLE") or None
+        if not executable_path:
+            executable_path = cls._detect_system_browser()
         return cls(
             browser=BrowserConfig(
                 headless=headless,
                 channel=os.getenv("DATACOLLECTOR_BROWSER_CHANNEL") or None,
-                executable_path=os.getenv("DATACOLLECTOR_BROWSER_EXECUTABLE") or None,
+                executable_path=executable_path,
                 storage_state=Path(os.getenv("DATACOLLECTOR_STORAGE_STATE"))
                 if os.getenv("DATACOLLECTOR_STORAGE_STATE")
                 else None,
             ),
             model=ModelConfig(
-                api_key=os.getenv("OPENAI_API_KEY"),
+                api_key=(
+                    os.getenv("OPENAI_API_KEY")
+                    or os.getenv("DATACOLLECTOR_OPENAI_API_KEY")
+                    or os.getenv("OPENAPI_API_KEY")
+                    or os.getenv("OPENAPI_KEY")
+                ),
                 base_url=os.getenv("OPENAI_BASE_URL")
+                or os.getenv("OPENAI_API_BASE")
                 or os.getenv("DATACOLLECTOR_OPENAI_BASE_URL")
+                or os.getenv("OPENAPI_BASE_URL")
+                or os.getenv("OPENAPI_URL")
                 or None,
                 model=os.getenv("DATACOLLECTOR_MODEL", "gpt-4.1-mini"),
                 temperature=float(os.getenv("DATACOLLECTOR_TEMPERATURE", "0.2")),
@@ -197,3 +208,16 @@ class RuntimeConfig(BaseModel):
     @staticmethod
     def _split_env_list(value: str) -> list[str]:
         return [item.strip() for item in value.split(",") if item.strip()]
+
+    @staticmethod
+    def _detect_system_browser() -> str | None:
+        candidates = [
+            Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+            Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+            Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+        return None

@@ -56,9 +56,8 @@ def chat(
     session = ChatSession(config)
 
     async def chat_loop() -> None:
-        await session.start()
         typer.echo(f"DataCollector Chat 已启动，会话目录：{session.session_dir}")
-        typer.echo("直接输入需求即可；输入 /help 查看命令；输入 /exit 退出。")
+        typer.echo("直接输入需求即可；输入 /help 查看命令；输入 /exit 退出。浏览器会在首次需要页面操作时启动。")
 
         async def handle(message: str, message_url: str | None = None) -> None:
             reply = await session.ask(message, url=message_url)

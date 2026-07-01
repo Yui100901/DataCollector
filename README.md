@@ -102,6 +102,20 @@ AI: ...
 AI: 已导出：...
 ```
 
+交互式模式支持会话命令：
+
+```text
+/open <url>              打开页面
+/observe                 观察当前页面
+/reset                   重置浏览器会话
+/save-state [path]       保存登录态
+/load-state <path>       加载登录态并重启会话
+/help                    查看帮助
+/exit                    退出
+```
+
+`dc chat` 会在同一个浏览器 page/context 中持续工作，所以可以先登录，再继续搜索、提取和导出。
+
 也可以带第一条消息启动：
 
 ```bash
